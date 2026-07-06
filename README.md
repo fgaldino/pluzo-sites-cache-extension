@@ -31,6 +31,14 @@ Extensao Chrome Manifest V3 para diagnosticar, localmente, como sites publicos P
 
 A janela principal mostra resumo, origem, status e alertas. Headers e evidencias ficam salvos localmente e aparecem no JSON exportado; o painel DevTools pode ser usado para investigacao tecnica.
 
+Controles da lista:
+
+- Clique no cabecalho de uma coluna para ordenar; clique novamente para inverter a ordem.
+- Use os chips de `Origem` para filtrar por uma ou mais classificacoes.
+- Ative `Agrupar request` para agrupar por metodo + URL exata, incluindo query string.
+
+Quando o mesmo request exato GET relevante aparece 2 ou mais vezes em ate 5 minutos sem browser cache, Cloudflare HIT ou Worker cache HIT, a ultima coluna mostra `Copiar prompt`. Esse prompt resume o problema para enviar a uma IA investigar causa e solucao.
+
 ## Headers Interpretados
 
 - `cache-control`: extrai `max-age` e `s-maxage`.
@@ -40,6 +48,8 @@ A janela principal mostra resumo, origem, status e alertas. Headers e evidencias
 - `x-cache-ttl`: TTL interno quando presente.
 - `x-pluzo-ssr-diag`: extrai `tenantRestCount`, `masterD1`, `metadataMemoryHit`, `publicReadModelHit` e `subrequests`.
 - `server-timing`: complementa tempos internos quando presente.
+
+Quando `cf-cache-status: HIT` e `x-cache: HIT` aparecem juntos, a origem exibida e `Cloudflare + Worker HIT`.
 
 ## Rotas Relevantes
 
@@ -59,6 +69,7 @@ A janela principal mostra resumo, origem, status e alertas. Headers e evidencias
 - `tenantRestCount>0`.
 - Rota cacheavel sem `x-cache`.
 - `cf-cache-status` `BYPASS`, `DYNAMIC` ou `MISS` em rota esperada quente.
+- Mesmo endpoint repetido 2+ vezes em 5 minutos sem cache observado.
 
 ## Privacidade
 

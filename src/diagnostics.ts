@@ -192,8 +192,9 @@ function classifyOrigin(args: {
   if ((args.input.fromCache || args.input.performance?.transferSize === 0) && !hasServerHeaders) {
     return "Browser cache";
   }
-  if (args.cfCacheStatus === "HIT") return "Cloudflare HIT";
+  if (args.cfCacheStatus === "HIT" && args.xCache === "HIT") return "Cloudflare + Worker HIT";
   if (args.xCache === "HIT") return "Worker cache HIT";
+  if (args.cfCacheStatus === "HIT") return "Cloudflare HIT";
   if (args.ssr.tenantRestCount !== undefined && args.ssr.tenantRestCount > 0) {
     return "Tenant REST usado";
   }

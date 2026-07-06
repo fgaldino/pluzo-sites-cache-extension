@@ -24,7 +24,9 @@
       <section class="toolbar">
         <label><input id="paused" type="checkbox" /> Pausar</label>
         <label><input id="relevantOnly" type="checkbox" /> Apenas relevantes</label>
+        <label><input id="groupByRequest" type="checkbox" /> Agrupar request</label>
         <div id="domainList" class="pill-row"></div>
+        <div id="originFilters" class="origin-filters"></div>
       </section>
 
       <section id="summary" class="summary"></section>
@@ -35,11 +37,13 @@
         <table>
           <thead>
             <tr>
-              <th>Hora</th>
-              <th>Request</th>
-              <th>Origem</th>
-              <th>Status</th>
-              <th>Alertas</th>
+              <th><button class="sort-button" type="button" data-sort="time">Hora</button></th>
+              <th><button class="sort-button" type="button" data-sort="request">Request</button></th>
+              <th><button class="sort-button" type="button" data-sort="origin">Origem</button></th>
+              <th><button class="sort-button" type="button" data-sort="status">Status</button></th>
+              <th><button class="sort-button" type="button" data-sort="duration">Tempo</button></th>
+              <th><button class="sort-button" type="button" data-sort="alerts">Alertas</button></th>
+              <th><button class="sort-button" type="button" data-sort="ai">IA</button></th>
             </tr>
           </thead>
           <tbody id="requestRows"></tbody>

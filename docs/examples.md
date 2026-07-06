@@ -16,7 +16,7 @@ Este arquivo registra validacoes sem dados sensiveis.
 
 - Rotas publicas cacheaveis devem mostrar `max-age=60`.
 - Rotas publicas cacheaveis devem mostrar `s-maxage=2592000`.
-- `cf-cache-status: HIT` deve aparecer como Cloudflare HIT.
+- `cf-cache-status: HIT` indica Cloudflare HIT; quando vier junto com `x-cache: HIT`, a extensao mostra `Cloudflare + Worker HIT`.
 - `x-cache: HIT` deve aparecer como Worker cache HIT.
 - `tenantRestCount=0` deve aparecer como caminho sem tenant REST.
 
@@ -57,18 +57,18 @@ Resultado:
 ```json
 {
   "ok": true,
-  "captured": 4,
+  "captured": "numero varia por recursos auxiliares carregados",
   "homes": [
     {
       "url": "https://pluzo.top/",
-      "origin": "Cloudflare HIT",
+      "origin": "Cloudflare + Worker HIT",
       "cfCacheStatus": "HIT",
       "xCache": "HIT",
       "tenantRestCount": 0
     },
     {
       "url": "https://pluzo.shop/",
-      "origin": "Cloudflare HIT",
+      "origin": "Cloudflare + Worker HIT",
       "cfCacheStatus": "HIT",
       "xCache": "HIT",
       "tenantRestCount": 0
@@ -77,7 +77,7 @@ Resultado:
 }
 ```
 
-O smoke valida que Chromium carregou o `dist/`, a extensao registrou requests reais em `pluzo.top` e `pluzo.shop`, e as homes foram classificadas como Cloudflare HIT. Validacao de movimentacao da janela para outro monitor ainda precisa ser feita manualmente em Chrome com interface grafica.
+O smoke valida que Chromium carregou o `dist/`, a extensao registrou requests reais em `pluzo.top` e `pluzo.shop`, e as homes foram classificadas como `Cloudflare + Worker HIT`. Validacao de movimentacao da janela para outro monitor ainda precisa ser feita manualmente em Chrome com interface grafica.
 
 ## Observacao
 

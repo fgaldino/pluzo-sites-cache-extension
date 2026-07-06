@@ -18,6 +18,13 @@ A extensao deve registrar continuamente as requisicoes observaveis enquanto Fern
 - Persistir tamanho e posicao da janela localmente quando viavel.
 - A pagina principal da janela destacada deve ocupar 100% da largura disponivel, sem largura maxima de conteudo.
 - A pagina principal nao deve exibir colunas de `Headers` nem `Evidencias`; esses dados devem continuar salvos em memoria local e exportaveis no JSON.
+- A lista principal deve exibir uma coluna `Tempo` com a duracao observada da resposta do endpoint.
+- A lista principal deve permitir ordenar ao clicar nos cabecalhos das colunas.
+- A lista principal deve permitir filtrar por uma ou mais opcoes da coluna `Origem`.
+- A lista principal deve permitir ativar `Agrupar request`, agrupando por metodo + URL exata, incluindo query string.
+- Se o mesmo request exato fizer 2 ou mais requisicoes GET relevantes em ate 5 minutos e todas continuarem sem evidencia de browser cache, Cloudflare HIT ou Worker cache HIT, a ultima coluna deve mostrar um botao para copiar um prompt de diagnostico para IA.
+- O prompt copiado deve explicar o problema, incluir endpoint, janela analisada, tempos, status, classificacao, headers cacheaveis salvos e alertas, sem incluir headers sensiveis.
+- Quando `fromCache=true` ou `transferSize=0` vier junto com headers de servidor mostrando `x-cache: MISS`, `tenantRestCount>0` ou `masterD1>0`, a extensao deve considerar a resposta como problema de cache/servidor, nao como cache bom.
 - Permitir ocultar, mostrar, limpar e pausar o monitoramento sem alterar o site.
 - Tratar falta de evidencia como `indeterminado`.
 
@@ -29,6 +36,7 @@ O "popup sempre visivel" deve ser implementado como uma janela destacada da exte
 
 - `cf-cache-status: HIT` indica cache Cloudflare.
 - `x-cache: HIT` indica cache interno do Worker SSR.
+- Quando `cf-cache-status: HIT` e `x-cache: HIT` aparecem juntos, exibir como `Cloudflare + Worker HIT` para nao esconder que o Worker cache tambem participou.
 - `x-pluzo-ssr-diag` com `tenantRestCount=0` indica ausencia de fallback tenant REST.
 - `x-pluzo-ssr-diag` com `tenantRestCount>0` indica uso de tenant REST.
 - `x-pluzo-ssr-diag` com `masterD1:N` indica consulta ao D1 master.

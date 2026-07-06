@@ -1,5 +1,6 @@
 export type CacheOrigin =
   | "Browser cache"
+  | "Cloudflare + Worker HIT"
   | "Cloudflare HIT"
   | "Worker cache HIT"
   | "MISS gerado"
