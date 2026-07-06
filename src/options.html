@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pluzo Cache - Dominios</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell options-shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Configuracao</p>
+          <h1>Dominios monitorados</h1>
+          <p>A extensao so registra requests dos dominios autorizados aqui.</p>
+        </div>
+        <button id="openDashboard" type="button">Abrir janela</button>
+      </header>
+
+      <form id="domainForm" class="domain-form">
+        <label for="domainInput">Dominio ou origem</label>
+        <div class="inline-form">
+          <input id="domainInput" name="domain" placeholder="pluzo.top ou https://cliente.com" autocomplete="off" />
+          <button type="submit">Adicionar</button>
+        </div>
+        <p class="muted">Para privacidade, cada dominio novo pede permissao de host do Chrome.</p>
+        <p id="error" class="error"></p>
+      </form>
+
+      <section class="table-card">
+        <h2>Ativos</h2>
+        <ul id="domains" class="domain-list"></ul>
+      </section>
+    </main>
+    <script type="module" src="./options.ts"></script>
+  </body>
+</html>

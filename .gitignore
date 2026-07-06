@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.zip
+*.crx
+*.pem
+*.log
+.DS_Store

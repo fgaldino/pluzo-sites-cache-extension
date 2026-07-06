@@ -58,3 +58,10 @@
 - Browser cache pode nao gerar request observavel; marcar como cache local quando inferivel.
 - Alguns campos HAR podem variar por versao do Chrome; manter fallback por headers.
 - Nao commitar `dist/`, `node_modules/`, builds empacotados ou arquivos com dados de navegacao.
+
+## Workflow De Build
+
+<!-- DOC-GUARD: Regra oficial em docs/build.md: toda alteracao da extensao deve deixar `dist/` atualizado. Alterar somente com pedido/autorizacao explicita de Fernando. -->
+
+- Sempre que alterar a extensao, rodar `npm run build` antes de concluir para manter `dist/` atualizado no workspace local.
+- Continuar sem commitar `dist/` salvo pedido explicito.

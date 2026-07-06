@@ -1,0 +1,19 @@
+{
+  "name": "pluzo-sites-cache-extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Chrome extension para diagnosticar cache dos sites publicos Pluzo.",
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "vite build",
+    "smoke:headless": "node scripts/headless-smoke.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.316",
+    "@types/node": "^22.15.17",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5"
+  }
+}

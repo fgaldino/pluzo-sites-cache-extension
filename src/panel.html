@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pluzo Cache DevTools</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell compact">
+      <header class="hero">
+        <div>
+          <p class="eyebrow" id="appMode">Painel DevTools</p>
+          <h1>Pluzo Cache</h1>
+          <p>HAR do DevTools complementa o monitoramento continuo.</p>
+        </div>
+        <div class="actions">
+          <button id="openDashboard" type="button">Abrir janela</button>
+          <button id="openOptions" type="button">Dominios</button>
+          <button id="clearRequests" type="button">Limpar</button>
+          <button id="exportJson" type="button">Exportar JSON</button>
+        </div>
+      </header>
+
+      <section class="toolbar">
+        <label><input id="paused" type="checkbox" /> Pausar</label>
+        <label><input id="relevantOnly" type="checkbox" /> Apenas relevantes</label>
+        <div id="domainList" class="pill-row"></div>
+      </section>
+
+      <section id="summary" class="summary"></section>
+
+      <section class="table-card">
+        <p id="emptyState" class="empty">Recarregue a pagina com DevTools aberto para capturar HAR completo.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Hora</th>
+              <th>Request</th>
+              <th>Origem</th>
+              <th>Status</th>
+              <th>Headers</th>
+              <th>Evidencias</th>
+              <th>Alertas</th>
+            </tr>
+          </thead>
+          <tbody id="requestRows"></tbody>
+        </table>
+      </section>
+    </main>
+    <script type="module" src="./panel.ts"></script>
+  </body>
+</html>

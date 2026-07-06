@@ -16,6 +16,8 @@ A extensao deve registrar continuamente as requisicoes observaveis enquanto Fern
 - Permitir manter a janela aberta enquanto o usuario navega no site monitorado.
 - Permitir mover a janela para o lado do website ou para outro monitor usando o gerenciador de janelas do sistema.
 - Persistir tamanho e posicao da janela localmente quando viavel.
+- A pagina principal da janela destacada deve ocupar 100% da largura disponivel, sem largura maxima de conteudo.
+- A pagina principal nao deve exibir colunas de `Headers` nem `Evidencias`; esses dados devem continuar salvos em memoria local e exportaveis no JSON.
 - Permitir ocultar, mostrar, limpar e pausar o monitoramento sem alterar o site.
 - Tratar falta de evidencia como `indeterminado`.
 
