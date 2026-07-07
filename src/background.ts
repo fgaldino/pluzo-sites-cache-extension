@@ -8,6 +8,7 @@ import {
 import { diagnoseRequest, headersArrayToMap, requestFromHarEntry } from "./diagnostics";
 import {
   clearRequests,
+  findStoredRequestMatch,
   getRequests,
   getSettings,
   getState,
@@ -208,8 +209,7 @@ async function handleHeadersReceived(details: chrome.webRequest.WebResponseHeade
   });
 
   partials.set(details.requestId, request);
-  await upsertRequest(request);
-  await broadcastRequest(request);
+  await saveAndBroadcastRequest(request);
 }
 
 async function handleCompleted(details: chrome.webRequest.WebResponseCacheDetails): Promise<void> {
@@ -235,8 +235,7 @@ async function handleCompleted(details: chrome.webRequest.WebResponseCacheDetail
   });
 
   partials.delete(details.requestId);
-  await upsertRequest(request);
-  await broadcastRequest(request);
+  await saveAndBroadcastRequest(request);
 }
 
 async function handlePerformanceEntries(entries: PerformanceSnapshot[], tabId?: number): Promise<void> {
@@ -262,8 +261,7 @@ async function handlePerformanceEntries(entries: PerformanceSnapshot[], tabId?: 
       }),
       performance: entry
     });
-    await upsertRequest(request);
-    await broadcastRequest(request);
+    await saveAndBroadcastRequest(request);
   }
 }
 
@@ -274,8 +272,7 @@ async function handleDevtoolsEntry(entry: HarLikeEntry): Promise<void> {
 
   const request = requestFromHarEntry(entry, `dt:${hashString(JSON.stringify(entry))}:${Date.now()}`);
   if (!request) return;
-  await upsertRequest(request);
-  await broadcastRequest(request);
+  await saveAndBroadcastRequest(request);
 }
 
 async function openDashboard(): Promise<void> {
@@ -356,6 +353,11 @@ function withDiagnostic(request: Omit<StoredRequest, "diagnostic">): StoredReque
     ...request,
     diagnostic: diagnoseRequest(request)
   };
+}
+
+async function saveAndBroadcastRequest(request: StoredRequest): Promise<void> {
+  const requests = await upsertRequest(request);
+  await broadcastRequest(findStoredRequestMatch(requests, request) ?? request);
 }
 
 async function broadcastRequest(request: StoredRequest): Promise<void> {
