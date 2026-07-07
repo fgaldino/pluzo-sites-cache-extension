@@ -3,6 +3,7 @@ export type CacheOrigin =
   | "Cloudflare + Worker HIT"
   | "Cloudflare HIT"
   | "Worker cache HIT"
+  | "Read-model publico"
   | "MISS gerado"
   | "D1 master usado"
   | "Tenant REST usado"
@@ -48,6 +49,25 @@ export interface SsrDiagnostic {
   raw?: string;
 }
 
+export interface PluzoCacheDiagnostic {
+  status?: "hit" | "miss" | "bypass";
+  route?: string;
+  reason?: string;
+  dataSource?: "worker-cache" | "public-read-model" | "tenant-rest" | "preview" | "none" | string;
+  normalizedPath?: string;
+  diagAt?: string;
+  responseId?: string;
+  responseGeneratedAt?: string;
+  currentDataAccess?: DataAccessDiagnostic;
+  generatedDataAccess?: DataAccessDiagnostic;
+}
+
+export interface DataAccessDiagnostic {
+  masterD1?: number;
+  tenantRest?: number;
+  raw?: string;
+}
+
 export interface ServerTimingMetric {
   name: string;
   durationMs?: number;
@@ -73,8 +93,12 @@ export interface DiagnosticAlert {
 export interface DiagnosticResult {
   origin: CacheOrigin;
   isRelevant: boolean;
+  browserCacheReplay: boolean;
+  currentDataAccess?: DataAccessDiagnostic;
+  generatedDataAccess?: DataAccessDiagnostic;
   cacheControl: CacheControlDirectives;
   ssr: SsrDiagnostic;
+  pluzoCache: PluzoCacheDiagnostic;
   serverTiming: ServerTimingMetric[];
   evidence: string[];
   alerts: DiagnosticAlert[];

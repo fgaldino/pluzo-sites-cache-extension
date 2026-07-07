@@ -1,11 +1,13 @@
 import type {
   CacheControlDirectives,
   CacheOrigin,
+  DataAccessDiagnostic,
   DiagnosticAlert,
   DiagnosticResult,
   HarLikeEntry,
   HeaderMap,
   PerformanceSnapshot,
+  PluzoCacheDiagnostic,
   ServerTimingMetric,
   SsrDiagnostic,
   StoredRequest
@@ -80,6 +82,25 @@ export function parseSsrDiagnostic(value: string | undefined): SsrDiagnostic {
   return ssr;
 }
 
+export function parsePluzoCacheDiagnostic(headers: HeaderMap): PluzoCacheDiagnostic {
+  const status = normalizeCacheStatus(headers["x-pluzo-cache-status"]);
+  const dataSource = headers["x-pluzo-data-source"]?.trim();
+
+  // REGRESSION-GUARD: considera somente headers publicos do SSR; nao depender de IDs internos ou corpo da resposta.
+  return {
+    status,
+    route: optionalText(headers["x-pluzo-cache-route"]),
+    reason: optionalText(headers["x-pluzo-cache-reason"]),
+    dataSource: optionalText(dataSource),
+    normalizedPath: optionalText(headers["x-pluzo-cache-normalized-path"]),
+    diagAt: optionalText(headers["x-pluzo-ssr-diag-at"]),
+    responseId: optionalText(headers["x-pluzo-response-id"]),
+    responseGeneratedAt: optionalText(headers["x-pluzo-response-generated-at"]),
+    currentDataAccess: parseDataAccess(headers["x-pluzo-current-data-access"]),
+    generatedDataAccess: parseDataAccess(headers["x-pluzo-generated-data-access"])
+  };
+}
+
 export function parseServerTiming(value: string | undefined): ServerTimingMetric[] {
   if (!value) return [];
 
@@ -125,8 +146,13 @@ export function diagnoseRequest(input: {
   const headers = sanitizeHeaders(input.responseHeaders);
   const cacheControl = parseCacheControl(headers["cache-control"]);
   const ssr = parseSsrDiagnostic(headers["x-pluzo-ssr-diag"]);
+  const pluzoCache = parsePluzoCacheDiagnostic(headers);
   const serverTiming = parseServerTiming(headers["server-timing"]);
-  const isRelevant = isRelevantUrl(input.url);
+  const isRelevant = isRelevantUrl(input.url) || Boolean(pluzoCache.route && pluzoCache.route !== "uncacheable");
+  const browserCacheReplay = isBrowserCacheReplay(input);
+  const ssrDataAccess = dataAccessFromSsr(ssr);
+  const currentDataAccess = browserCacheReplay ? undefined : (pluzoCache.currentDataAccess ?? ssrDataAccess);
+  const generatedDataAccess = pluzoCache.generatedDataAccess ?? (browserCacheReplay ? (pluzoCache.currentDataAccess ?? ssrDataAccess) : undefined);
   const evidence: string[] = [];
   const alerts: DiagnosticAlert[] = [];
 
@@ -140,12 +166,23 @@ export function diagnoseRequest(input: {
   if (headers["age"]) evidence.push(`age=${headers["age"]}`);
   if (xCache) evidence.push(`x-cache=${xCache}`);
   if (headers["x-cache-ttl"]) evidence.push(`x-cache-ttl=${headers["x-cache-ttl"]}`);
+  if (pluzoCache.status) evidence.push(`pluzo-cache-status=${pluzoCache.status}`);
+  if (pluzoCache.route) evidence.push(`pluzo-cache-route=${pluzoCache.route}`);
+  if (pluzoCache.reason) evidence.push(`pluzo-cache-reason=${pluzoCache.reason}`);
+  if (pluzoCache.dataSource) evidence.push(`pluzo-data-source=${pluzoCache.dataSource}`);
+  if (pluzoCache.normalizedPath) evidence.push(`pluzo-normalized-path=${pluzoCache.normalizedPath}`);
+  if (pluzoCache.diagAt) evidence.push(`pluzo-diag-at=${pluzoCache.diagAt}`);
+  if (pluzoCache.responseId) evidence.push(`pluzo-response-id=${pluzoCache.responseId}`);
+  if (pluzoCache.responseGeneratedAt) evidence.push(`pluzo-response-generated-at=${pluzoCache.responseGeneratedAt}`);
+  if (browserCacheReplay) evidence.push("D1 nesta ocorrencia=0 (browser cache)");
+  if (currentDataAccess) evidence.push(`data-access-atual=${formatDataAccess(currentDataAccess)}`);
+  if (generatedDataAccess) evidence.push(`data-access-geracao=${formatDataAccess(generatedDataAccess)}`);
   if (ssr.tenantRestCount !== undefined) evidence.push(`tenantRestCount=${ssr.tenantRestCount}`);
   if (ssr.masterD1 !== undefined) evidence.push(`masterD1=${ssr.masterD1}`);
   if (ssr.subrequests) evidence.push(`subrequests=${ssr.subrequests}`);
 
-  const origin = classifyOrigin({ cfCacheStatus, xCache, ssr, input });
-  alerts.push(...policyAlerts({ cacheControl, cfCacheStatus, headers, isRelevant, ssr, xCache }));
+  const origin = classifyOrigin({ browserCacheReplay, cfCacheStatus, currentDataAccess, xCache, ssr, pluzoCache });
+  alerts.push(...policyAlerts({ browserCacheReplay, cacheControl, cfCacheStatus, currentDataAccess, generatedDataAccess, headers, isRelevant, pluzoCache, ssr, xCache }));
 
   if (origin === "Indeterminado") {
     alerts.push({ severity: "info", message: "Sem headers suficientes para cravar origem." });
@@ -155,7 +192,7 @@ export function diagnoseRequest(input: {
     alerts.push({ severity: "ok", message: "Caminho quente OK: Cloudflare/Worker HIT sem tenant REST." });
   }
 
-  return { origin, isRelevant, cacheControl, ssr, serverTiming, evidence, alerts };
+  return { origin, isRelevant, browserCacheReplay, currentDataAccess, generatedDataAccess, cacheControl, ssr, pluzoCache, serverTiming, evidence, alerts };
 }
 
 export function requestFromHarEntry(entry: HarLikeEntry, id: string): StoredRequest | undefined {
@@ -183,63 +220,106 @@ export function requestFromHarEntry(entry: HarLikeEntry, id: string): StoredRequ
 }
 
 function classifyOrigin(args: {
+  browserCacheReplay: boolean;
   cfCacheStatus?: string;
+  currentDataAccess?: DataAccessDiagnostic;
   xCache?: string;
   ssr: SsrDiagnostic;
-  input: { fromCache?: boolean; responseHeaders: HeaderMap; performance?: PerformanceSnapshot };
+  pluzoCache: PluzoCacheDiagnostic;
 }): CacheOrigin {
-  const hasServerHeaders = Object.keys(args.input.responseHeaders).length > 0;
-  if ((args.input.fromCache || args.input.performance?.transferSize === 0) && !hasServerHeaders) {
-    return "Browser cache";
-  }
-  if (args.cfCacheStatus === "HIT" && args.xCache === "HIT") return "Cloudflare + Worker HIT";
+  if (args.browserCacheReplay) return "Browser cache";
+  if (args.cfCacheStatus === "HIT" && (args.xCache === "HIT" || args.pluzoCache.status === "hit")) return "Cloudflare + Worker HIT";
+  if (args.pluzoCache.status === "hit") return "Worker cache HIT";
   if (args.xCache === "HIT") return "Worker cache HIT";
   if (args.cfCacheStatus === "HIT") return "Cloudflare HIT";
-  if (args.ssr.tenantRestCount !== undefined && args.ssr.tenantRestCount > 0) {
+  if (args.pluzoCache.dataSource === "tenant-rest" || ((args.currentDataAccess?.tenantRest ?? args.ssr.tenantRestCount ?? 0) > 0)) {
     return "Tenant REST usado";
   }
-  if (args.ssr.masterD1 !== undefined && args.ssr.masterD1 > 0) {
+  if (args.pluzoCache.dataSource === "public-read-model") return "Read-model publico";
+  if ((args.currentDataAccess?.masterD1 ?? args.ssr.masterD1 ?? 0) > 0) {
     return "D1 master usado";
   }
   if (["MISS", "BYPASS", "DYNAMIC", "EXPIRED", "REVALIDATED"].includes(args.cfCacheStatus ?? "")) {
     return "MISS gerado";
   }
+  if (args.pluzoCache.status === "miss") return "MISS gerado";
   if (args.xCache && args.xCache !== "HIT") return "MISS gerado";
-  if (args.input.fromCache || args.input.performance?.transferSize === 0) return "Browser cache";
   return "Indeterminado";
 }
 
 function policyAlerts(args: {
+  browserCacheReplay: boolean;
   cacheControl: CacheControlDirectives;
   cfCacheStatus?: string;
+  currentDataAccess?: DataAccessDiagnostic;
+  generatedDataAccess?: DataAccessDiagnostic;
   headers: HeaderMap;
   isRelevant: boolean;
+  pluzoCache: PluzoCacheDiagnostic;
   ssr: SsrDiagnostic;
   xCache?: string;
 }): DiagnosticAlert[] {
   const alerts: DiagnosticAlert[] = [];
   if (!args.isRelevant) return alerts;
 
-  if (args.cacheControl["max-age"] !== "60") {
-    alerts.push({ severity: "warn", message: "Rota cacheavel sem max-age=60." });
+  if (!args.browserCacheReplay || args.headers["cache-control"]) {
+    if (args.cacheControl["max-age"] !== "60") {
+      alerts.push({ severity: "warn", message: "Rota cacheavel sem max-age=60." });
+    }
+    if (args.cacheControl["s-maxage"] !== "2592000") {
+      alerts.push({ severity: "warn", message: "Rota cacheavel sem s-maxage=2592000." });
+    }
   }
-  if (args.cacheControl["s-maxage"] !== "2592000") {
-    alerts.push({ severity: "warn", message: "Rota cacheavel sem s-maxage=2592000." });
+  if (args.browserCacheReplay && (args.generatedDataAccess?.tenantRest ?? 0) > 0) {
+    alerts.push({ severity: "info", message: "Browser cache: tenant REST apareceu apenas na geracao original." });
   }
-  if (args.ssr.tenantRestCount !== undefined && args.ssr.tenantRestCount > 0) {
+  if (!args.browserCacheReplay && (args.pluzoCache.dataSource === "tenant-rest" || ((args.currentDataAccess?.tenantRest ?? args.ssr.tenantRestCount ?? 0) > 0))) {
     alerts.push({ severity: "error", message: "tenantRestCount>0: houve fallback tenant REST." });
   }
-  if (!args.headers["x-cache"]) {
+  if (!args.browserCacheReplay && !args.headers["x-cache"] && !args.pluzoCache.status) {
     alerts.push({ severity: "warn", message: "Rota cacheavel sem header x-cache." });
   }
-  if (["BYPASS", "DYNAMIC", "MISS"].includes(args.cfCacheStatus ?? "")) {
+  if (!args.browserCacheReplay && ["BYPASS", "DYNAMIC", "MISS"].includes(args.cfCacheStatus ?? "")) {
     alerts.push({ severity: "warn", message: `Cloudflare ${args.cfCacheStatus}: rota esperada quente nao veio HIT.` });
   }
-  if (args.xCache && args.xCache !== "HIT") {
+  if (!args.browserCacheReplay && args.xCache && args.xCache !== "HIT") {
     alerts.push({ severity: "warn", message: `Worker cache ${args.xCache}: rota nao veio HIT.` });
   }
 
   return alerts;
+}
+
+function normalizeCacheStatus(value: string | undefined): PluzoCacheDiagnostic["status"] {
+  const normalized = value?.trim().toLowerCase();
+  return normalized === "hit" || normalized === "miss" || normalized === "bypass" ? normalized : undefined;
+}
+
+function optionalText(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  return normalized ? normalized : undefined;
+}
+
+function isBrowserCacheReplay(input: { fromCache?: boolean; performance?: PerformanceSnapshot }): boolean {
+  return input.fromCache === true || input.performance?.transferSize === 0;
+}
+
+function parseDataAccess(value: string | undefined): DataAccessDiagnostic | undefined {
+  if (!value) return undefined;
+  const parsed: DataAccessDiagnostic = {
+    masterD1: numberFrom(value, /masterD1\s*[:=]\s*(\d+)/i),
+    tenantRest: numberFrom(value, /tenantRest\s*[:=]\s*(\d+)/i),
+    raw: value
+  };
+  return parsed.masterD1 !== undefined || parsed.tenantRest !== undefined ? parsed : undefined;
+}
+
+function dataAccessFromSsr(ssr: SsrDiagnostic): DataAccessDiagnostic | undefined {
+  if (ssr.masterD1 === undefined && ssr.tenantRestCount === undefined) return undefined;
+  return { masterD1: ssr.masterD1, tenantRest: ssr.tenantRestCount };
+}
+
+export function formatDataAccess(value: DataAccessDiagnostic): string {
+  return `masterD1=${value.masterD1 ?? 0};tenantRest=${value.tenantRest ?? 0}`;
 }
 
 function numberFrom(value: string, pattern: RegExp): number | undefined {

@@ -1,5 +1,6 @@
 import { detectRepeatedNoCacheProblem, exactRequestKey as cacheProblemRequestKey } from "./cache-problems";
-import type { ExtensionMessage, ExtensionState, MessageResponse, StoredRequest } from "./types";
+import { formatDataAccess } from "./diagnostics";
+import type { CacheOrigin, ExtensionMessage, ExtensionState, MessageResponse, StoredRequest } from "./types";
 
 interface AppOptions {
   mode: "window" | "panel";
@@ -170,7 +171,10 @@ function renderSummary(): void {
   const worker = requests.filter((request) =>
     ["Worker cache HIT", "Cloudflare + Worker HIT"].includes(request.diagnostic.origin)
   ).length;
-  const slow = requests.filter((request) => ["D1 master usado", "Tenant REST usado"].includes(request.diagnostic.origin)).length;
+  const slow = requests.filter((request) => {
+    const access = request.diagnostic.currentDataAccess;
+    return (access?.masterD1 ?? 0) > 0 || (access?.tenantRest ?? 0) > 0;
+  }).length;
 
   const metrics = [
     ["Total", requests.length.toString()],
@@ -255,8 +259,26 @@ function chipCell(value: string): HTMLTableCellElement {
   const chip = document.createElement("span");
   chip.className = `chip ${classForOrigin(value)}`;
   chip.textContent = value;
+  chip.title = originHint(value);
+  chip.setAttribute("aria-label", `${value}: ${originHint(value)}`);
   td.append(chip);
   return td;
+}
+
+function originHint(value: string): string {
+  // REGRESSION-GUARD: Hints da coluna Origem devem ser claros para suporte/cliente, sem depender de termos tecnicos de cache.
+  const hints: Record<CacheOrigin, string> = {
+    "Browser cache": "O navegador reaproveitou uma copia que ja tinha guardada. Nesta navegacao, o site quase nao precisou buscar essa informacao de novo.",
+    "Cloudflare + Worker HIT": "A resposta veio muito rapida porque ja estava pronta nas camadas de entrega do site. E o melhor caminho esperado para paginas publicas repetidas.",
+    "Cloudflare HIT": "A Cloudflare entregou uma copia pronta da resposta. Isso evita trabalho extra no site e costuma deixar o carregamento mais rapido.",
+    "Worker cache HIT": "O sistema interno do site encontrou uma copia pronta da resposta. Isso evita recalcular a pagina naquele momento.",
+    "Read-model publico": "O site leu dados publicos ja preparados para exibicao. Geralmente e um caminho normal e mais leve.",
+    "MISS gerado": "Nao havia uma copia pronta, entao o site precisou montar uma resposta nova. Pode ser normal na primeira visita ou apos mudancas.",
+    "D1 master usado": "O site precisou consultar a base principal para completar a resposta. Pode indicar mais trabalho que o ideal para paginas muito acessadas.",
+    "Tenant REST usado": "O site precisou buscar dados por um caminho mais lento. Se acontecer muito, pode deixar a pagina ou filtros mais demorados.",
+    Indeterminado: "Nao houve informacao suficiente para dizer com seguranca de onde a resposta veio. Recarregue com o painel aberto para coletar mais dados."
+  };
+  return hints[value as CacheOrigin] ?? hints.Indeterminado;
 }
 
 function alertCell(request: StoredRequest): HTMLTableCellElement {
@@ -301,8 +323,14 @@ function headerSummary(request: StoredRequest): string {
   return [
     `cf=${headers["cf-cache-status"] ?? "-"}`,
     `x=${headers["x-cache"] ?? "-"}`,
+    `plz=${request.diagnostic.pluzoCache.status ?? "-"}`,
+    `rota=${request.diagnostic.pluzoCache.route ?? "-"}`,
+    `fonte=${request.diagnostic.pluzoCache.dataSource ?? "-"}`,
+    `id=${shortResponseId(request)}`,
     `max=${maxAge}`,
     `smax=${sMaxAge}`,
+    `d1Atual=${request.diagnostic.currentDataAccess ? formatDataAccess(request.diagnostic.currentDataAccess) : "-"}`,
+    `d1Ger=${request.diagnostic.generatedDataAccess ? formatDataAccess(request.diagnostic.generatedDataAccess) : "-"}`,
     `tenant=${request.diagnostic.ssr.tenantRestCount ?? "-"}`,
     `d1=${request.diagnostic.ssr.masterD1 ?? "-"}`
   ].join(" · ");
@@ -469,4 +497,9 @@ function classForOrigin(value: string): string {
   if (value.includes("D1") || value.includes("MISS")) return "chip-warn";
   if (value.includes("HIT") || value.includes("Browser")) return "chip-ok";
   return "chip-muted";
+}
+
+function shortResponseId(request: StoredRequest): string {
+  const id = request.diagnostic.pluzoCache.responseId;
+  return id ? id.slice(0, 8) : "-";
 }

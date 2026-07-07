@@ -1,3 +1,4 @@
+import { formatDataAccess } from "./diagnostics";
 import type { StoredRequest } from "./types";
 
 const REPEATED_NO_CACHE_WINDOW_MS = 5 * 60 * 1000;
@@ -55,8 +56,10 @@ function isCacheHit(request: StoredRequest): boolean {
   const worker = request.responseHeaders["x-cache"]?.toUpperCase();
   const hasServerHeaders = Object.keys(request.responseHeaders).length > 0;
 
-  // REGRESSION-GUARD: Se ha headers de servidor com MISS/tenant REST, nao tratar fromCache/transferSize=0 como cache bom.
+  // REGRESSION-GUARD: browser cache vence headers antigos MISS/D1; D1/REST desses headers e geracao original, nao uso atual.
   // Alterar somente com pedido/autorizacao explicita de Fernando.
+  if (request.diagnostic.browserCacheReplay) return true;
+
   if (
     hasServerHeaders &&
     (worker === "MISS" ||
@@ -117,6 +120,18 @@ function requestSummary(request: StoredRequest, index: number): string {
 - Origem classificada: ${request.diagnostic.origin}
 - cf-cache-status: ${headers["cf-cache-status"] ?? "-"}
 - x-cache: ${headers["x-cache"] ?? "-"}
+- x-pluzo-cache-status: ${request.diagnostic.pluzoCache.status ?? "-"}
+- x-pluzo-cache-route: ${request.diagnostic.pluzoCache.route ?? "-"}
+- x-pluzo-cache-reason: ${request.diagnostic.pluzoCache.reason ?? "-"}
+- x-pluzo-data-source: ${request.diagnostic.pluzoCache.dataSource ?? "-"}
+- x-pluzo-cache-normalized-path: ${request.diagnostic.pluzoCache.normalizedPath ?? "-"}
+- x-pluzo-ssr-diag-at: ${request.diagnostic.pluzoCache.diagAt ?? "-"}
+- x-pluzo-response-id: ${request.diagnostic.pluzoCache.responseId ?? "-"}
+- x-pluzo-response-generated-at: ${request.diagnostic.pluzoCache.responseGeneratedAt ?? "-"}
+- x-pluzo-current-data-access: ${headers["x-pluzo-current-data-access"] ?? "-"}
+- x-pluzo-generated-data-access: ${headers["x-pluzo-generated-data-access"] ?? "-"}
+- D1/REST nesta ocorrencia: ${formatOccurrenceDataAccess(request)}
+- D1/REST na geracao original: ${formatGeneratedDataAccess(request)}
 - cache-control: ${headers["cache-control"] ?? "-"}
 - x-cache-ttl: ${headers["x-cache-ttl"] ?? "-"}
 - x-pluzo-ssr-diag: ${headers["x-pluzo-ssr-diag"] ?? "-"}
@@ -126,4 +141,13 @@ function requestSummary(request: StoredRequest, index: number): string {
 
 function formatDuration(durationMs: number | undefined): string {
   return Number.isFinite(durationMs) ? `${Math.round(durationMs ?? 0)}ms` : "-";
+}
+
+function formatOccurrenceDataAccess(request: StoredRequest): string {
+  if (request.diagnostic.browserCacheReplay) return "nao (browser cache)";
+  return request.diagnostic.currentDataAccess ? formatDataAccess(request.diagnostic.currentDataAccess) : "indeterminado";
+}
+
+function formatGeneratedDataAccess(request: StoredRequest): string {
+  return request.diagnostic.generatedDataAccess ? formatDataAccess(request.diagnostic.generatedDataAccess) : "indeterminado";
 }

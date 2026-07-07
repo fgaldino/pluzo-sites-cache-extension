@@ -17,7 +17,7 @@
 - Guardiao: `docs/requisitos.md`, `src/cache-problems.ts` e `src/dashboard-app.ts`.
 - Regra: se o mesmo request exato GET relevante aparecer 2+ vezes em 5 minutos sem browser cache, Cloudflare HIT ou Worker cache HIT, a ultima coluna deve mostrar botao `Copiar prompt`.
 - O prompt deve incluir endpoint, janela, tempos, status, classificacao, headers de cache salvos e alertas, sem headers sensiveis.
-- Se `fromCache=true`/`transferSize=0` vier junto com headers de servidor indicando `x-cache: MISS`, `tenantRestCount>0` ou `masterD1>0`, nao classificar como cache bom para suprimir o prompt.
+- Se `fromCache=true`/`transferSize=0` vier junto com headers antigos `MISS`, `tenantRestCount>0` ou `masterD1>0`, classificar a ocorrencia atual como browser cache; D1/REST desses headers entra apenas como geracao original.
 
 ## Controles Da Lista
 

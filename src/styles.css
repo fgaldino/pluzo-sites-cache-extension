@@ -250,6 +250,10 @@ th {
   white-space: nowrap;
 }
 
+.chip[title] {
+  cursor: help;
+}
+
 .pill-ok,
 .chip-ok,
 .alert-ok {
